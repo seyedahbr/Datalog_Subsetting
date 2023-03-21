@@ -3,7 +3,6 @@ import sys
 import io
 from typing import Optional, Union, List
 from pathlib import Path
-from rdflib import Graph
 
 prefixes_first = {
     "pqn": "http://www.wikidata.org/prop/qualifier/value-normalized/",
@@ -48,6 +47,12 @@ def genargs(prog: Optional[str] = None) -> ArgumentParser:
 
 def remove_prefixes_nt(input_file: str, output_file: str):
     with open(input_file, "r") as infile, open(output_file, "w") as outfile:
+        for key, value in prefixes_first.items():
+            outfile.write('@prefix {0}: <{1}> .\n'.format(key, value))
+        for key, value in prefixes_second.items():
+            outfile.write('@prefix {0}: <{1}> .\n'.format(key, value))
+        for key, value in prefixes_third.items():
+            outfile.write('@prefix {0}: <{1}> .\n'.format(key, value))
         for line in infile:
             for prefix, namespace in prefixes_first.items():
                 line = line.replace(f"<{namespace}", f"{prefix}:")
