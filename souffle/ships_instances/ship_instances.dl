@@ -1,0 +1,7 @@
+.decl triple(x:symbol, y:symbol, z:symbol, w:symbol)
+.input triple(filename="./ships_no_prefix.nt", delimiter=" ")
+
+.decl ship(x:symbol)
+.output ship(filename="./ship_instances.out")
+
+ship(x) :- triple(x, "wdt:P31", "wd:Q11446", ".").

@@ -1,0 +1,13 @@
+.decl Triple(x:symbol, y:symbol, z:symbol, w:symbol)
+.input Triple(filename="./gene_variant_disease2.nt", delimiter=" ")
+
+.decl isGene(g:symbol)
+.decl isDisease(d:symbol)
+
+.decl Q(x:symbol)
+.output Q(filename="./pathogenc_genes.out")
+
+isGene(g) :- Triple(g,"<http://www.wikidata.org/prop/direct/P31>","<http://www.wikidata.org/entity/Q7187>", ".").
+isDisease(d) :- Triple(d,"<http://www.wikidata.org/prop/direct/P31>","<http://www.wikidata.org/entity/Q12136>", ".").
+Q(g) :- isGene(g), isDisease(d), Triple(g, "<http://www.wikidata.org/prop/direct/P2293>", d, ".").
+Q(g) :- isGene(g), isDisease(d), Triple(v, "<http://www.wikidata.org/prop/direct/P3433>", g, "."), Triple(v, "<http://www.wikidata.org/prop/P3354>", n, "."), Triple(n, "<http://www.wikidata.org/prop/qualifier/P2175>", d, ".").
