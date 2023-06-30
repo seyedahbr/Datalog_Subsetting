@@ -1,0 +1,6 @@
+database({
+  triple(X:string, Y:string, Z:string, W:string)
+}).
+
+ship(X) <- triple(X,"<http://www.wikidata.org/prop/direct/P31>","<http://www.wikidata.org/entity/Q11446>",".").
+
