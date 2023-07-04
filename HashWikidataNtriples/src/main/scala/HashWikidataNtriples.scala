@@ -1,53 +1,62 @@
-import org.apache.spark.sql.{SparkSession, Row}
-import org.apache.spark.sql.types.{IntegerType, StructField, StructType, StringType}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.expr
 
 object HashWikidataNtriples {
   def main(args: Array[String]): Unit = {
-    // Create SparkSession
     val spark = SparkSession.builder()
       .appName("HashWikidataNtriples")
       .getOrCreate()
 
     val inputFile = args(0)
-    val outputFile = args(1)
+    val hashtableFile = args(1)
+    val dfFile = args(2)
 
-    // Read the CSV file with tab delimiter
+    // find out the proper delimiter
+    val ext = inputFile.split("\\.").last
+    val delimiter = ext match {
+      case "csv" => ","
+      case "tsv" => "\t"
+      case "nt" => " "
+      case _ => throw new UnsupportedOperationException(s"File extension is: $ext. Expected csv|tsv|nt")
+    }
+
+    // Read the CSV file with the proper delimiter
     val df = spark.read
-      .option("delimiter", ",")
-      .csv(inputFile)
+      .format("csv")
+      .option("delimiter", delimiter)
+      .load(inputFile)
 
-    // Select the first three columns    
-    val selectedColumns = df.select("_c0", "_c1", "_c2")
-    
-    // Map each cell to its hash code in a dictionary (the hashtable)
-    val dictionary = selectedColumns.rdd
-      .flatMap(row => row.toSeq.map(_.toString).zip(row.toSeq.map(_.hashCode)))
-      .collectAsMap()
+    // Create a hash table of cells based on the Java String.hashCode of the first three columns
+    val hashTableRDD = df.rdd.flatMap(row => {
+      val hashTable = scala.collection.mutable.HashMap.empty[String, Int]
+      val hash1 = row.getString(0).hashCode
+      val hash2 = row.getString(1).hashCode
+      val hash3 = row.getString(2).hashCode
 
-    // Create the hashed output RDD
-    val hashRDD = selectedColumns
-      .rdd
-      .map(row => (dictionary.getOrElse(row.getString(0), 0), dictionary.getOrElse(row.getString(1), 0), dictionary.getOrElse(row.getString(2), 0)))
-    
-    // Define the schema for the hashed DataFrame dataset
-    val schema = StructType(Seq(
-      StructField("_c0", IntegerType, nullable = false),
-      StructField("_c1", IntegerType, nullable = false),
-      StructField("_c2", IntegerType, nullable = false)
-    ))
+      // Add the hash values to the hash table
+      hashTable(row.getString(0)) = hash1
+      hashTable(row.getString(1)) = hash2
+      hashTable(row.getString(2)) = hash3
 
-    // Create DataFrame from RDD with the defined schema
-    val dfHash = spark.createDataFrame(hashRDD.map(Row.fromTuple), schema)
+      hashTable
+    }).distinct()
 
-    // Save the hashed DataFrame as a new CSV file
-    dfHash.write.csv(outputFile)
+    // Save the hash table for future mapping
+    hashTableRDD.saveAsTextFile(hashtableFile)
 
-    // Save the dictionary as the hashtable
-    val hashTableRDD = spark.sparkContext.parallelize(dictionary.toSeq)
-      .map { case (key, value) => s"$key, $value" }
-    hashTableRDD.coalesce(1).saveAsTextFile(inputFile + "_hashtable")
+    // Create a new dataset by replacing each cell of the first three columns with its hash value
+    val hashedDF = df.withColumn("_c0", expr("hash(_c0)"))
+      .withColumn("_c1", expr("hash(_c1)"))
+      .withColumn("_c2", expr("hash(_c2)")).select("_c0", "_c1", "_c2")
 
-    // Stop the SparkSession
+    // Save the first three columns as a new dataset in CSV format    
+    hashedDF.write
+      .format("csv")
+      .save(dfFile)
+
+    // Stop SparkSession
     spark.stop()
+          
   }
 }
+
